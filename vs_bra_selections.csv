@@ -1,0 +1,10 @@
+Selection,Push Up,Full-Coverage,Wireless,Sport Bra,Lightly Lined,Strapless,Unlined,T-shirt Bras,Matching Sets
+Color (preferred),Black,Nude,Black,"Berrylicious (07ZP)",Nude,Nude,Black,Nude,Black
+Color (fallback #1),Nude,Black,Nude,Black,Black,Black,Nude,Black,Nude
+Color (fallback #2),White,White,White,White,White,White,White,White,White
+Band (preferred),34,34,34,34,34,34,34,34,34
+Band (fallback),32,32,32,32,32,32,32,32,32
+Cup (preferred),B,C,B,C,B,B,B,B,B
+Cup (fallback),C,B,C,B,C,C,C,C,C
+Panty size (Matching Sets only),—,—,—,—,—,—,—,—,M
+Quantity,1,1,1,1,1,1,1,1,1

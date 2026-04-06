@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Playwright artifacts
+playwright-report/
+test-results/
+
+# Local test artifacts
+tests/artifacts/
+
+# Local dev
+.DS_Store
+.env
+.env.*
+
+# Generated selections/logs
+pw-tests-selected.txt
+
+# IDE
+.vscode/settings.json
+.vscode/*.log

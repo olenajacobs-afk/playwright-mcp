@@ -1,0 +1,39 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "VS: All tests (headed, desktop)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:vs:all:desktop:headed"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "PW: VS (all) — 2 desktop projects",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"pw:test:vs",
+				"--",
+				"--project=chromium-desktop-1440",
+				"--project=chromium-desktop-1920",
+				"--reporter=line,html"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test",
+			"presentation": {
+				"reveal": "always",
+				"focus": true,
+				"panel": "dedicated",
+				"clear": true
+			}
+		}
+	]
+}
