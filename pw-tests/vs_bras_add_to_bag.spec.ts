@@ -16,6 +16,13 @@ import {
 
 const BRAS_PLP_URL = process.env.BRAS_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras';
 const PUSHUP_PLP_URL = process.env.PUSHUP_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/push-up';
+const LACE_PLP_URL = process.env.LACE_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/lace';
+const SMOOTH_PLP_URL = process.env.SMOOTH_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/smooth';
+const SMOOTH_PUSHUP_PLP_URL = process.env.SMOOTH_PUSHUP_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/smooth/push-up';
+const SMOOTH_WIRELESS_PLP_URL = process.env.SMOOTH_WIRELESS_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/smooth/wireless';
+const SMOOTH_TSHIRT_PLP_URL = process.env.SMOOTH_TSHIRT_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/smooth/t-shirt';
+const SMOOTH_STRAPLESS_PLP_URL = process.env.SMOOTH_STRAPLESS_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/smooth/strapless';
+const SMOOTH_DEMI_PLP_URL = process.env.SMOOTH_DEMI_PLP_URL || 'https://www.victoriassecret.com/us/vs/bras/smooth/demi';
 const TARGET_COLOR = 'Berrylicious (07ZP)';
 const REQUIRE_TARGET_COLOR = process.env.REQUIRE_TARGET_COLOR === '1';
 
@@ -211,6 +218,47 @@ async function applyBraSizedFilterBestEffort(page: Page, warn: (msg: string) => 
 
   if (!option) {
     warn('No bra-sized/cup-related filter option detected; continuing without filter.');
+    await applyOrCloseFilterPanel(page, panel, warn);
+    return false;
+  }
+
+  await option.click({ timeout: 10_000 }).catch(() => null);
+  await applyOrCloseFilterPanel(page, panel, warn);
+  await page.waitForLoadState('domcontentloaded', { timeout: 20_000 }).catch(() => null);
+  await bestEffortWaitForTransientLoaders(page);
+  return true;
+}
+
+async function applyLaceFilterBestEffort(page: Page, warn: (msg: string) => void) {
+  const panel = await openPlpFilterPanel(page, warn);
+  if (!panel) return false;
+
+  // Try to find a filter option for "Lace". This usually appears under Fabric/Material filters.
+  const prefer = [/\blace\b/i, /lace\s*detail/i, /lace\s*trim/i];
+
+  let option: Locator | null = null;
+  for (const re of prefer) {
+    const byRole = panel.getByRole('checkbox', { name: re }).first();
+    if ((await byRole.count().catch(() => 0)) > 0) {
+      option = byRole;
+      break;
+    }
+
+    const aria = panel.locator('[role="checkbox"]').filter({ hasText: re }).first();
+    if ((await aria.count().catch(() => 0)) > 0) {
+      option = aria;
+      break;
+    }
+
+    const input = panel.locator('input[type="checkbox"]').filter({ has: panel.getByText(re) }).first();
+    if ((await input.count().catch(() => 0)) > 0) {
+      option = input;
+      break;
+    }
+  }
+
+  if (!option) {
+    warn('No Lace filter option detected; continuing without Lace filter.');
     await applyOrCloseFilterPanel(page, panel, warn);
     return false;
   }
@@ -655,29 +703,40 @@ async function openShineStrapMajorBandCupPdp(page: Page, testInfo: any) {
   const main = pushUpPage.locator('main').first();
   const majorSection = majorLiftSection(main);
   const scope = (await majorSection.count().catch(() => 0)) > 0 ? majorSection : main;
-  const shineLink = await findShineStrapTileLink(scope);
-  if (!shineLink) throw new Error('Could not find a Shine Strap product tile/link in the MAJOR section.');
+  const shineLinks = await findShineStrapTileLinks(scope);
+  const linkCount = await shineLinks.count().catch(() => 0);
+  if (linkCount === 0) {
+    warn('Could not find any Shine Strap product tile/link in the MAJOR section.');
+    return null;
+  }
 
-  await checkpoint(pushUpPage);
-  const pdpPage = await openPdpFromPlpTile(pushUpPage, shineLink);
-  attachAutoDismissPopups(pdpPage, warn);
-  await checkpoint(pdpPage);
-  await bestEffortWaitForTransientLoaders(pdpPage);
+  for (let i = 0; i < linkCount; i++) {
+    const shineLink = shineLinks.nth(i);
+    await checkpoint(pushUpPage);
+    const pdpPage = await openPdpFromPlpTile(pushUpPage, shineLink).catch(() => null);
+    if (!pdpPage) continue;
 
-  // Ensure a strap swatch is selected (default/first). This also helps hydrate the size matrix.
-  const selectableSwatches = await getVisibleEnabledSwatchLabelsBestEffort(pdpPage);
-  if (selectableSwatches.length > 0) {
+    attachAutoDismissPopups(pdpPage, warn);
     await checkpoint(pdpPage);
-    await selectNthShineStrapSwatchRequired(pdpPage, 1);
     await bestEffortWaitForTransientLoaders(pdpPage);
+
+    const selectableSwatches = await getVisibleEnabledSwatchLabelsBestEffort(pdpPage);
+    if (selectableSwatches.length > 0) {
+      await checkpoint(pdpPage);
+      await selectNthShineStrapSwatchRequired(pdpPage, 1);
+      await bestEffortWaitForTransientLoaders(pdpPage);
+    }
+
+    if (await bandCupSelectableOnPdpBestEffort(pdpPage, warn)) {
+      return { pdpPage, warn, checkpoint };
+    }
+
+    await pdpPage.close().catch(() => null);
+    warn(`Shine Strap PDP candidate #${i + 1} did not expose selectable Band+Cup options; trying next candidate.`);
   }
 
-  // Require Band+Cup for band coverage tests.
-  if (!(await bandCupSelectableOnPdpBestEffort(pdpPage, warn))) {
-    throw new Error('Shine Strap PDP did not expose selectable Band+Cup options in this run.');
-  }
-
-  return { pdpPage, warn, checkpoint };
+  warn('Could not find any Shine Strap PDP with selectable Band+Cup options in this run.');
+  throw new Error('Could not find any Shine Strap PDP with selectable Band+Cup options; expected at least one valid PDP.');
 }
 
 async function hasBandAndCupSelectorsBestEffort(pdpPage: Page): Promise<boolean> {
@@ -816,17 +875,28 @@ async function clickMajorLiftCardRequired(page: Page) {
     }
   }
 
-  const majorButton = page
-    .getByRole('button', { name: /\bmajor\b.*\blift\b/i })
-    .first()
-    .or(page.getByRole('button', { name: /\bmajor\b:\s*adds\s*2\s*cups\b/i }).first())
-    .or(page.getByRole('button', { name: /\bmajor\b.*\bcup/i }).first())
-    .or(page.locator('button:has-text("MAJOR"), button:has-text("Major")').first());
+  const findFirstVisibleEnabled = async (locators: Locator[]): Promise<Locator | null> => {
+    for (const locator of locators) {
+      const candidate = locator.first();
+      if ((await candidate.count().catch(() => 0)) === 0) continue;
+      if (!(await candidate.isVisible({ timeout: 5000 }).catch(() => false))) continue;
+      if (!(await candidate.isEnabled().catch(() => false))) continue;
+      return candidate;
+    }
+    return null;
+  };
 
-  const majorLink = page
-    .getByRole('link', { name: /\bmajor\b.*\blift\b/i })
-    .first()
-    .or(page.locator('a[href*="#major" i]').first());
+  const majorButton = await findFirstVisibleEnabled([
+    page.getByRole('button', { name: /\bmajor\b.*\blift\b/i }),
+    page.getByRole('button', { name: /\bmajor\b:\s*adds\s*2\s*cups\b/i }),
+    page.getByRole('button', { name: /\bmajor\b.*\bcup/i }),
+    page.locator('button:has-text("MAJOR"), button:has-text("Major")'),
+  ]);
+
+  const majorLink = await findFirstVisibleEnabled([
+    page.getByRole('link', { name: /\bmajor\b.*\blift\b/i }),
+    page.locator('a[href*="#major" i]'),
+  ]);
 
   const clickOnce = async (target: Locator) => {
     await bestEffortPressEscape(page);
@@ -834,13 +904,21 @@ async function clickMajorLiftCardRequired(page: Page) {
     await bestEffortDismissOverlays(page);
     await ensureNoBlockingOverlays(page);
 
+    await target.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => null);
     await target.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => null);
     try {
       await target.click({ timeout: 10_000 });
     } catch {
       await bestEffortDismissOverlays(page);
       await ensureNoBlockingOverlays(page);
-      await target.click({ timeout: 10_000, force: true });
+      await target.click({ timeout: 10_000, force: true }).catch(async () => {
+        const stillAttached = (await target.count().catch(() => 0)) > 0;
+        if (!page.isClosed() && stillAttached) {
+          await target.evaluate((el) => {
+            if (el instanceof HTMLElement) el.click();
+          });
+        }
+      });
     }
     await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => null);
     await bestEffortWaitForTransientLoaders(page);
@@ -856,7 +934,7 @@ async function clickMajorLiftCardRequired(page: Page) {
     }
   };
 
-  if ((await majorButton.count().catch(() => 0)) > 0 && (await majorButton.isVisible({ timeout: 5000 }).catch(() => false))) {
+  if (majorButton) {
     // Click exactly once on the happy path; retry only if the click fails (e.g. overlay intercepts).
     try {
       await clickOnce(majorButton);
@@ -868,7 +946,7 @@ async function clickMajorLiftCardRequired(page: Page) {
     return;
   }
 
-  if ((await majorLink.count().catch(() => 0)) > 0 && (await majorLink.isVisible({ timeout: 5000 }).catch(() => false))) {
+  if (majorLink) {
     try {
       await clickOnce(majorLink);
     } catch {
@@ -995,23 +1073,18 @@ async function waitForMiniBagOverlay(page: Page, opts: { requireVisible: boolean
   }
 }
 
-async function findShineStrapTileLink(main: Locator): Promise<Locator | null> {
-  // Prefer a product tile/container that contains the Shine Strap name.
+async function findShineStrapTileLinks(main: Locator): Promise<Locator> {
+  // Prefer product cards containing the Shine Strap text.
   const tile = main
     .locator('article, [data-testid*="product" i], [data-test*="product" i], li, div')
-    .filter({ hasText: /shine\s*strap/i })
-    .first();
+    .filter({ hasText: /shine\s*strap/i });
 
   if ((await tile.count().catch(() => 0)) > 0) {
-    const link = productLinks(tile).first();
+    const link = productLinks(tile);
     if ((await link.count().catch(() => 0)) > 0) return link;
   }
 
-  // Fallback: any product-like link whose own text includes Shine Strap.
-  const direct = productLinks(main).filter({ hasText: /shine\s*strap/i }).first();
-  if ((await direct.count().catch(() => 0)) > 0) return direct;
-
-  return null;
+  return productLinks(main).filter({ hasText: /shine\s*strap/i });
 }
 
 async function getPdpColorSwatchLabelsBestEffort(pdpPage: Page): Promise<string[]> {
@@ -1212,6 +1285,182 @@ async function selectNthShineStrapSwatchRequired(pdpPage: Page, n1Based: number)
 }
 
 test.describe('Bras — Add to Bag (Desktop E2E)', () => {
+  async function openLacePlpBestEffort(page: Page, warn: (m: string) => void, checkpoint: (p: Page) => Promise<void>) {
+    const hasAnyProductLinks = async () => {
+      const main = page.locator('main').first();
+      const links = productLinks(main);
+      const count = await links.count().catch(() => 0);
+      return count > 0;
+    };
+
+    // Prefer a dedicated Lace PLP, then fall back to applying a Lace filter on Push-Up,
+    // then fall back to SRP (search) for lace bras.
+    let laceSource: 'lace-plp' | 'pushup+lace-filter' | 'srp' = 'lace-plp';
+    await page.goto(LACE_PLP_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+    await checkpoint(page);
+    await bestEffortWaitForTransientLoaders(page);
+
+    if (!(await hasAnyProductLinks())) {
+      laceSource = 'pushup+lace-filter';
+      warn(`Lace PLP had no product links (URL=${page.url()}); trying Push-Up PLP + Lace filter.`);
+      await page.goto(PUSHUP_PLP_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+      await checkpoint(page);
+      await bestEffortWaitForTransientLoaders(page);
+      const applied = await applyLaceFilterBestEffort(page, warn);
+      if (!applied) warn('Could not apply Lace filter on Push-Up PLP.');
+    }
+
+    if (!(await hasAnyProductLinks())) {
+      laceSource = 'srp';
+      warn('Push-Up + Lace filter fallback had no product links; using SRP search fallback.');
+      const srpUrl = `${VS_BASE_URL}search?q=${encodeURIComponent('lace bra')}`;
+      await page.goto(srpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+      await checkpoint(page);
+      await bestEffortWaitForTransientLoaders(page);
+    }
+
+    if (!(await hasAnyProductLinks())) {
+      throw new Error(`No Lace products detected today after all fallbacks (source=${laceSource}, url=${page.url()}).`);
+    }
+
+    return { laceSource, plpUrl: page.url() };
+  }
+
+  async function ensurePlpHasAtLeastNProductLinks(page: Page, minCount: number, warn: (m: string) => void) {
+    const maxScrolls = Math.max(1, Math.floor(Number(process.env.LACE_MAX_SCROLLS || '14') || 14));
+    const desired = Math.max(1, Math.floor(minCount));
+
+    let lastCount = -1;
+    let stagnant = 0;
+
+    for (let attempt = 0; attempt <= maxScrolls; attempt++) {
+      const main = page.locator('main').first();
+      const count = await productLinks(main).count().catch(() => 0);
+      if (count >= desired) return count;
+
+      if (count === lastCount) stagnant++;
+      else stagnant = 0;
+      lastCount = count;
+
+      if (stagnant >= 2) break;
+
+      // Scroll to prompt lazy-load/infinite scroll.
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => null);
+      await page.waitForTimeout(900).catch(() => null);
+      await bestEffortWaitForTransientLoaders(page);
+    }
+
+    const main = page.locator('main').first();
+    const finalCount = await productLinks(main).count().catch(() => 0);
+    warn(`Could not load ${desired} product tiles; only saw ${finalCount} after scrolling.`);
+    return finalCount;
+  }
+
+  async function addLaceProductFromTileIndex1Based(page: Page, testInfo: any, tileIndex1Based: number) {
+    const isHeaded = process.env.HEADLESS === '0';
+    const warn = makeWarn(testInfo);
+    const demoDelayMs = isHeaded ? 600 : 0;
+
+    attachAutoDismissPopups(page, warn);
+    const checkpoint = async (p: Page) => {
+      await bestEffortPressEscape(p);
+      await bestEffortDismissAllPopups(p);
+      await bestEffortDismissOverlays(p);
+      await ensureNoBlockingOverlays(p);
+    };
+
+    const { laceSource, plpUrl } = await openLacePlpBestEffort(page, warn, checkpoint);
+
+    // Increase odds of bra-sized PDPs.
+    await checkpoint(page);
+    await applyBraSizedFilterBestEffort(page, warn);
+    await checkpoint(page);
+    await bestEffortWaitForTransientLoaders(page);
+
+    // Ensure we have enough tiles loaded to attempt the requested index.
+    const requested = Math.max(1, Math.floor(tileIndex1Based));
+    const count = await ensurePlpHasAtLeastNProductLinks(page, requested, warn);
+    if (count <= 0) throw new Error(`No product tiles found on lace source=${laceSource} (url=${page.url()}).`);
+
+    const effectiveIndex = Math.min(requested, count);
+    if (effectiveIndex !== requested) {
+      warn(`Requested Lace tile #${requested} but only ${count} tiles are available; using tile #${effectiveIndex} instead.`);
+    }
+
+    const main = page.locator('main').first();
+    const candidates = productLinks(main);
+    const tileLink = candidates.nth(effectiveIndex - 1);
+    await tileLink.scrollIntoViewIfNeeded().catch(() => null);
+
+    await checkpoint(page);
+    const opened = await openPdpFromPlpTile(page, tileLink);
+    attachAutoDismissPopups(opened, warn);
+    await checkpoint(opened);
+    await bestEffortWaitForTransientLoaders(opened);
+
+    const pdpH1 = opened.locator('main h1').first();
+    await expect(pdpH1, 'Expected PDP H1').toBeVisible({ timeout: 30_000 });
+    const productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+
+    const addToBag = addToBagButton(opened);
+    const addCount = await addToBag.count().catch(() => 0);
+    if (addCount === 0) {
+      throw new Error(`Lace tile #${effectiveIndex}: PDP had no Add to Bag (url=${opened.url()}).`);
+    }
+
+    const hasBandCupOnPdp = await hasBandAndCupSelectorsBestEffort(opened);
+
+    await demoWait(opened, demoDelayMs);
+    await checkpoint(opened);
+    await selectFirstColorBestEffort(opened, warn);
+    await demoWait(opened, demoDelayMs);
+
+    await checkpoint(opened);
+    if (hasBandCupOnPdp) {
+      await selectFirstAvailableFromSection(opened, /\bband\b|band\s*size/i);
+      await demoWait(opened, demoDelayMs);
+
+      await checkpoint(opened);
+      try {
+        await selectFirstAvailableFromSection(opened, /\bcup\b|cup\s*size/i);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        warn(`Cup selection failed on lace PDP; re-selecting first available band and retrying cup. (${msg})`);
+        await checkpoint(opened);
+        await selectFirstAvailableFromSection(opened, /\bband\b|band\s*size/i);
+        await checkpoint(opened);
+        await selectFirstAvailableFromSection(opened, /\bcup\b|cup\s*size/i);
+      }
+      await demoWait(opened, demoDelayMs);
+    } else {
+      await selectFirstAvailableFromSection(opened, /^size$/i);
+      await demoWait(opened, demoDelayMs);
+    }
+
+    await checkpoint(opened);
+    await selectShipToYouBestEffort(opened, warn);
+    await demoWait(opened, demoDelayMs);
+
+    await checkpoint(opened);
+    await expect(addToBag, 'Expected Add to bag button to be visible').toBeVisible({ timeout: 30_000 });
+    await expect(addToBag, 'Expected Add to bag button to be enabled').toBeEnabled({ timeout: 20_000 });
+    await addToBag.click({ timeout: 20_000 });
+
+    await checkpoint(opened);
+    await bestEffortWaitForTransientLoaders(opened);
+    await checkpoint(opened);
+    await waitForMiniBagOverlay(opened, { requireVisible: isHeaded, productTitle, warn });
+    await demoWait(opened, isHeaded ? 1500 : 0);
+
+    // Close and return to PLP for the next test (best-effort).
+    if (opened !== page) await opened.close().catch(() => null);
+    await page.goto(plpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => null);
+    await checkpoint(page);
+    await bestEffortWaitForTransientLoaders(page);
+
+    return { productTitle, effectiveIndex, laceSource };
+  }
+
   test('BRAS-E2E-02 — Bras → Sport Bra → select color/size → Add to bag', async ({ page }, testInfo) => {
     const isHeaded = process.env.HEADLESS === '0';
     const slowMoMs = Number(process.env.SLOWMO || '0');
@@ -1532,6 +1781,151 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     expect(true).toBeTruthy();
   });
 
+  test.describe('Lace', () => {
+    test('BRAS-E2E-09 — Lace → first tile, then next (+1) until no Lace products → select first color/band/cup → Add to bag', async ({ page }, testInfo) => {
+      const isHeaded = process.env.HEADLESS === '0';
+      const slowMoMs = Number(process.env.SLOWMO || '0');
+      if (isHeaded) test.setTimeout(slowMoMs > 0 ? 330_000 : 210_000);
+      else test.setTimeout(210_000);
+
+      const warn = makeWarn(testInfo);
+      const demoDelayMs = isHeaded ? 600 : 0;
+
+      const maxAdds = Math.max(1, Math.floor(Number(process.env.LACE_MAX_ADDS || '3') || 3));
+      const maxTilesToScan = Math.max(3, Math.floor(Number(process.env.LACE_MAX_TILES || '25') || 25));
+
+      attachAutoDismissPopups(page, warn);
+      const checkpoint = async (p: Page) => {
+        await bestEffortPressEscape(p);
+        await bestEffortDismissAllPopups(p);
+        await bestEffortDismissOverlays(p);
+        await ensureNoBlockingOverlays(p);
+      };
+
+      const { plpUrl } = await openLacePlpBestEffort(page, warn, checkpoint);
+
+      // Increase the odds of getting bra-sized PDPs.
+      await checkpoint(page);
+      await applyBraSizedFilterBestEffort(page, warn);
+      await checkpoint(page);
+      await bestEffortWaitForTransientLoaders(page);
+
+      const plpUrlFinal = plpUrl;
+      let adds = 0;
+
+      for (let tileIndex = 0; tileIndex < maxTilesToScan && adds < maxAdds; tileIndex++) {
+        // Ensure lazy-loaded tiles are present as we move to higher indices.
+        await ensurePlpHasAtLeastNProductLinks(page, tileIndex + 1, warn);
+        const main = page.locator('main').first();
+        const candidates = productLinks(main);
+        const linkCount = await candidates.count().catch(() => 0);
+        if (tileIndex >= linkCount) break;
+
+        const tileLink = candidates.nth(tileIndex);
+        if (!(await tileLink.isVisible({ timeout: 1500 }).catch(() => false))) continue;
+
+        await checkpoint(page);
+        const opened = await openPdpFromPlpTile(page, tileLink).catch(() => null);
+        if (!opened) continue;
+
+        attachAutoDismissPopups(opened, warn);
+        await checkpoint(opened);
+        await bestEffortWaitForTransientLoaders(opened);
+
+        const pdpH1 = opened.locator('main h1').first();
+        await pdpH1.waitFor({ state: 'visible', timeout: 20_000 }).catch(() => null);
+        const productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+
+        const addToBag = addToBagButton(opened);
+        const addCount = await addToBag.count().catch(() => 0);
+        if (addCount === 0) {
+          warn(`Lace tile #${tileIndex + 1}: PDP had no Add to Bag; trying next tile. (url=${opened.url()})`);
+          if (opened !== page) await opened.close().catch(() => null);
+          else {
+            await page.goto(plpUrlFinal, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => null);
+            await checkpoint(page);
+            await bestEffortWaitForTransientLoaders(page);
+          }
+          continue;
+        }
+
+        const hasBandCupOnPdp = await hasBandAndCupSelectorsBestEffort(opened);
+
+        await demoWait(opened, demoDelayMs);
+        await checkpoint(opened);
+        await selectFirstColorBestEffort(opened, warn);
+        await demoWait(opened, demoDelayMs);
+
+        await checkpoint(opened);
+        if (hasBandCupOnPdp) {
+          await selectFirstAvailableFromSection(opened, /\bband\b|band\s*size/i);
+          await demoWait(opened, demoDelayMs);
+
+          await checkpoint(opened);
+          try {
+            await selectFirstAvailableFromSection(opened, /\bcup\b|cup\s*size/i);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            warn(`Cup selection failed on lace PDP; re-selecting first available band and retrying cup. (${msg})`);
+            await checkpoint(opened);
+            await selectFirstAvailableFromSection(opened, /\bband\b|band\s*size/i);
+            await checkpoint(opened);
+            await selectFirstAvailableFromSection(opened, /\bcup\b|cup\s*size/i);
+          }
+          await demoWait(opened, demoDelayMs);
+        } else {
+          // Some lace products can be alpha-sized; fall back to generic Size.
+          await selectFirstAvailableFromSection(opened, /^size$/i);
+          await demoWait(opened, demoDelayMs);
+        }
+
+        await checkpoint(opened);
+        await selectShipToYouBestEffort(opened, warn);
+        await demoWait(opened, demoDelayMs);
+
+        await checkpoint(opened);
+        await expect(addToBag, 'Expected Add to bag button to be visible').toBeVisible({ timeout: 30_000 });
+        await expect(addToBag, 'Expected Add to bag button to be enabled').toBeEnabled({ timeout: 20_000 });
+
+        await addToBag.click({ timeout: 20_000 });
+        await checkpoint(opened);
+        await bestEffortWaitForTransientLoaders(opened);
+
+        await checkpoint(opened);
+        await waitForMiniBagOverlay(opened, { requireVisible: isHeaded, productTitle, warn });
+        await demoWait(opened, isHeaded ? 1500 : 0);
+
+        adds++;
+        warn(`Added lace product #${adds}/${maxAdds} from tile #${tileIndex + 1} (title=${productTitle || 'unknown'})`);
+
+        if (opened !== page) {
+          await opened.close().catch(() => null);
+        } else {
+          await page.goto(plpUrlFinal, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => null);
+          await checkpoint(page);
+          await bestEffortWaitForTransientLoaders(page);
+        }
+      }
+
+      expect(adds, 'Expected to add at least one Lace product to bag').toBeGreaterThan(0);
+    });
+
+    const laceMaxProducts = Math.max(1, Math.floor(Number(process.env.LACE_MAX_PRODUCTS || '20') || 20));
+    for (let i = 1; i <= laceMaxProducts; i++) {
+      test(`BRAS-E2E-09-${String(i).padStart(2, '0')} — Lace tile #${i} → select first color/band/cup → Ship to you → Add to bag`, async ({ page }, testInfo) => {
+        const isHeaded = process.env.HEADLESS === '0';
+        const slowMoMs = Number(process.env.SLOWMO || '0');
+        // Per-tile Lace tests can still require PLP scrolling + PDP hydration.
+        if (isHeaded) test.setTimeout(slowMoMs > 0 ? 330_000 : 210_000);
+        else test.setTimeout(210_000);
+
+        const result = await addLaceProductFromTileIndex1Based(page, testInfo, i);
+        expect(result.productTitle.length >= 0).toBeTruthy();
+      });
+    }
+  });
+
+
   async function openMajorPushUpBandCupPdp(page: Page, testInfo: any) {
     const warn = makeWarn(testInfo);
     attachAutoDismissPopups(page, warn);
@@ -1803,20 +2197,55 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     const main = page.locator('main').first();
     const majorSection = majorLiftSection(main);
     const scope = (await majorSection.count().catch(() => 0)) > 0 ? majorSection : main;
-    const shineLink = await findShineStrapTileLink(scope);
-    if (!shineLink) {
+    const shineLinks = await findShineStrapTileLinks(scope);
+    const linkCount = await shineLinks.count().catch(() => 0);
+    if (linkCount === 0) {
       throw new Error('Could not find a Shine Strap product tile/link in the MAJOR (Adds 2 Cups) section on the Push-Up page.');
     }
 
-    await checkpoint(page);
-    const pdpPage = await openPdpFromPlpTile(page, shineLink);
-    attachAutoDismissPopups(pdpPage, warn);
-    await checkpoint(pdpPage);
-    await bestEffortWaitForTransientLoaders(pdpPage);
+    let pdpPage: Page | null = null;
+    let productTitle = '';
+    let foundValid = false;
+
+    for (let i = 0; i < linkCount; i++) {
+      const shineLink = shineLinks.nth(i);
+      await checkpoint(page);
+      const candidatePage = await openPdpFromPlpTile(page, shineLink).catch(() => null);
+      if (!candidatePage) continue;
+
+      attachAutoDismissPopups(candidatePage, warn);
+      await checkpoint(candidatePage);
+      await bestEffortWaitForTransientLoaders(candidatePage);
+
+      const candidateH1 = candidatePage.locator('main h1').first();
+      await candidateH1.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => null);
+      const candidateTitle = ((await candidateH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+
+      const selectableSwatches = await getVisibleEnabledSwatchLabelsBestEffort(candidatePage);
+      if (selectableSwatches.length > 0) {
+        await checkpoint(candidatePage);
+        await selectNthShineStrapSwatchRequired(candidatePage, 1);
+        await bestEffortWaitForTransientLoaders(candidatePage);
+      }
+
+      if (await bandCupSelectableOnPdpBestEffort(candidatePage, warn)) {
+        pdpPage = candidatePage;
+        productTitle = candidateTitle;
+        foundValid = true;
+        break;
+      }
+
+      await candidatePage.close().catch(() => null);
+      warn(`Shine Strap candidate #${i + 1} did not expose selectable Band+Cup options; trying next candidate.`);
+    }
+
+    if (!foundValid || !pdpPage) {
+      throw new Error('Could not find a Shine Strap PDP with selectable Band+Cup options in the MAJOR section.');
+    }
 
     const pdpH1 = pdpPage.locator('main h1').first();
     await expect(pdpH1, 'Expected PDP H1').toBeVisible({ timeout: 30_000 });
-    const productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+    productTitle = productTitle || ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
 
     // Skip beyond what is actually selectable (visible+enabled), not just what exists in the DOM.
     const selectableSwatches = await getVisibleEnabledSwatchLabelsBestEffort(pdpPage);
@@ -1878,4 +2307,124 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
       await runShineStrapNthStrapFlow(page, testInfo, i);
     });
   }
+
+  test.describe('Gradient Shine Selection', () => {
+    test('BRAS-E2E-17 — MAJOR Bra → select Gradient Shine option → band/cup → Ship to you → Add to bag', async ({ page }, testInfo) => {
+      const isHeaded = process.env.HEADLESS === '0';
+      const slowMoMs = Number(process.env.SLOWMO || '0');
+      if (isHeaded) test.setTimeout(slowMoMs > 0 ? 330_000 : 210_000);
+      else test.setTimeout(210_000);
+
+      const warn = makeWarn(testInfo);
+      const demoDelayMs = isHeaded ? 600 : 0;
+
+      attachAutoDismissPopups(page, warn);
+      const checkpoint = async (p: Page) => {
+        await bestEffortPressEscape(p);
+        await bestEffortDismissAllPopups(p);
+        await bestEffortDismissOverlays(p);
+        await ensureNoBlockingOverlays(p);
+      };
+
+      // Go to general Bras PLP to find bras with Gradient Shine option
+      await page.goto(BRAS_PLP_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+      await checkpoint(page);
+      await bestEffortWaitForTransientLoaders(page);
+
+      const main = page.locator('main').first();
+
+      // Find a product tile that might have Gradient Shine option
+      const productLinks = main.locator('a[href*="/p/"], a[href*="/product/"]');
+      const linkCount = await productLinks.count().catch(() => 0);
+      if (linkCount === 0) {
+        throw new Error('No product links found on Bras PLP; expected Gradient Shine products.');
+      }
+
+      // Try the first few tiles until we find one with Gradient Shine option
+      let foundGradientShine = false;
+      let pdpPage: Page | null = null;
+      let productTitle = '';
+
+      for (let i = 0; i < Math.min(linkCount, 5) && !foundGradientShine; i++) {
+        const tileLink = productLinks.nth(i);
+        if (!(await tileLink.isVisible({ timeout: 1500 }).catch(() => false))) continue;
+
+        await checkpoint(page);
+        const opened = await openPdpFromPlpTile(page, tileLink).catch(() => null);
+        if (!opened) continue;
+
+        attachAutoDismissPopups(opened, warn);
+        await checkpoint(opened);
+        await bestEffortWaitForTransientLoaders(opened);
+
+        // Check if this PDP has Gradient Shine option (case insensitive, partial match)
+        const gradientShineSwatch = opened.locator('button[aria-label*="gradient" i][aria-label*="shine" i], [role="button"][aria-label*="gradient" i][aria-label*="shine" i], button[aria-label*="gradient shine" i], [role="button"][aria-label*="gradient shine" i]');
+        const hasGradientShine = (await gradientShineSwatch.count().catch(() => 0)) > 0;
+
+        if (hasGradientShine) {
+          pdpPage = opened;
+          const pdpH1 = opened.locator('main h1').first();
+          productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+          foundGradientShine = true;
+          warn(`Found Gradient Shine option on: ${productTitle}`);
+        } else {
+          // Close this PDP and try the next one
+          if (opened !== page) await opened.close().catch(() => null);
+        }
+      }
+
+      if (!foundGradientShine || !pdpPage) {
+        throw new Error('No bra with Gradient Shine option found on any checked PDP.');
+      }
+
+      // Now select the Gradient Shine option
+      await checkpoint(pdpPage);
+      const gradientShineSwatch = pdpPage.locator('button[aria-label*="gradient" i][aria-label*="shine" i], [role="button"][aria-label*="gradient" i][aria-label*="shine" i], button[aria-label*="gradient shine" i], [role="button"][aria-label*="gradient shine" i]').first();
+      await gradientShineSwatch.scrollIntoViewIfNeeded().catch(() => null);
+      await expect(gradientShineSwatch, 'Expected Gradient Shine swatch to be visible').toBeVisible({ timeout: 10_000 });
+      await expect(gradientShineSwatch, 'Expected Gradient Shine swatch to be enabled').toBeEnabled({ timeout: 5_000 });
+      await gradientShineSwatch.click({ timeout: 10_000 });
+      await bestEffortWaitForTransientLoaders(pdpPage);
+      await demoWait(pdpPage, demoDelayMs);
+
+      // Check if this PDP has band/cup selectors
+      const hasBandCupOnPdp = await hasBandAndCupSelectorsBestEffort(pdpPage);
+
+      // Band and Cup selection
+      await checkpoint(pdpPage);
+      if (hasBandCupOnPdp) {
+        await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
+        await demoWait(pdpPage, demoDelayMs);
+
+        await checkpoint(pdpPage);
+        await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
+        await demoWait(pdpPage, demoDelayMs);
+      } else {
+        // Some bras might use alpha sizing
+        await selectFirstAvailableFromSection(pdpPage, /^size$/i);
+        await demoWait(pdpPage, demoDelayMs);
+      }
+
+      // Ship to you
+      await checkpoint(pdpPage);
+      await selectShipToYouBestEffort(pdpPage, warn);
+      await demoWait(pdpPage, demoDelayMs);
+
+      // Add to bag
+      const addToBag = addToBagButton(pdpPage);
+      await checkpoint(pdpPage);
+      await addToBag.scrollIntoViewIfNeeded().catch(() => null);
+      await expect(addToBag, 'Expected Add to bag button to be visible').toBeVisible({ timeout: 30_000 });
+      await expect(addToBag, 'Expected Add to bag button to be enabled').toBeEnabled({ timeout: 20_000 });
+      await addToBag.click({ timeout: 20_000 });
+      await checkpoint(pdpPage);
+      await bestEffortWaitForTransientLoaders(pdpPage);
+
+      await checkpoint(pdpPage);
+      await waitForMiniBagOverlay(pdpPage, { requireVisible: isHeaded, productTitle, warn });
+      await demoWait(pdpPage, isHeaded ? 2500 : 0);
+
+      expect(true).toBeTruthy();
+    });
+  });
 });

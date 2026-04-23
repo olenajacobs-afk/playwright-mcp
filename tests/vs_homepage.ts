@@ -99,12 +99,12 @@ async function ensureNoBlockingOverlays(page) {
 }
 
 async function assertNoHorizontalOverflow(page) {
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(function() {
     const el = document.documentElement;
     const body = document.body;
     const w = window.innerWidth;
-    const docW = el?.scrollWidth ?? 0;
-    const bodyW = body?.scrollWidth ?? 0;
+    const docW = el && el.scrollWidth ? el.scrollWidth : 0;
+    const bodyW = body && body.scrollWidth ? body.scrollWidth : 0;
     return { innerWidth: w, docScrollWidth: docW, bodyScrollWidth: bodyW };
   });
 
@@ -121,12 +121,13 @@ async function getHeroCandidate(page) {
     const vh = window.innerHeight;
     const vw = window.innerWidth;
 
-    const visibleArea = (r) =>
-      Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)) *
-      Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+    function visibleArea(r) {
+      return Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)) *
+             Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+    }
 
     const imageCandidates = Array.from(document.querySelectorAll("img"))
-      .map((img) => {
+      .map(function(img) {
         const r = img.getBoundingClientRect();
         const area = visibleArea(r);
         return {
@@ -142,10 +143,10 @@ async function getHeroCandidate(page) {
           height: r.height,
         };
       })
-      .filter((c) => c.area > 0 && c.src);
+      .filter(function(c) { return c.area > 0 && c.src; });
 
     const videoCandidates = Array.from(document.querySelectorAll("video"))
-      .map((v) => {
+      .map(function(v) {
         const r = v.getBoundingClientRect();
         const area = visibleArea(r);
         return {
@@ -159,10 +160,10 @@ async function getHeroCandidate(page) {
           height: r.height,
         };
       })
-      .filter((c) => c.area > 0);
+      .filter(function(c) { return c.area > 0; });
 
-    const all = [...imageCandidates, ...videoCandidates];
-    all.sort((a, b) => b.area - a.area);
+    const all = imageCandidates.concat(videoCandidates);
+    all.sort(function(a, b) { return b.area - a.area; });
     return all[0] || null;
   });
 }
@@ -187,13 +188,13 @@ async function findFirstCarousel(page) {
     const el = candidates.nth(i);
     if (!(await el.isVisible().catch(() => false))) continue;
 
-    const canScroll = await el.evaluate((node) => {
+    const canScroll = await el.evaluate(function(node) {
       const s = node.scrollWidth > node.clientWidth + 5;
       // Some carousels scroll an inner region.
       const inner = node.querySelector("[data-carousel], [class*='track' i], [class*='scroll' i], ul, ol, div");
       const innerScroll = inner ? inner.scrollWidth > inner.clientWidth + 5 : false;
-      return { s, innerScroll };
-    }).catch(() => ({ s: false, innerScroll: false }));
+      return { s: s, innerScroll: innerScroll };
+    }).catch(function() { return { s: false, innerScroll: false }; });
 
     if (canScroll.s || canScroll.innerScroll) return el;
 
@@ -206,20 +207,20 @@ async function findFirstCarousel(page) {
 }
 
 async function getScrollLeft(locator) {
-  return locator.evaluate((node) => {
+  return locator.evaluate(function(node) {
     return node.scrollLeft;
   });
 }
 
 async function getCarouselSignature(carousel) {
   return carousel
-    .evaluate((node) => {
+    .evaluate(function(node) {
       const text = (node.innerText || "").trim().replace(/\s+/g, " ");
       const imgCount = node.querySelectorAll("img").length;
       const linkCount = node.querySelectorAll("a").length;
-      return `${text.slice(0, 400)}|imgs:${imgCount}|links:${linkCount}`;
+      return text.slice(0, 400) + "|imgs:" + imgCount + "|links:" + linkCount;
     })
-    .catch(() => "");
+    .catch(function() { return ""; });
 }
 
 async function clickNextIfPresent(carousel) {
