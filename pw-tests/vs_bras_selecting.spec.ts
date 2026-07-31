@@ -13,8 +13,14 @@ import {
   applyOrCloseFilterPanel,
 } from './utils/vs';
 
-// VS Base URL
+// VS Base URL (typically host only; omit trailing slash unless you know your join paths.)
 const VS_BASE_URL = process.env.VS_BASE_URL || 'https://www.victoriassecret.com';
+
+/** Avoid `${VS_BASE_URL}search?q=…` → `victoriassecret.comsearch` when the base has no trailing slash. */
+function vsUsSearchUrl(query: string): string {
+  const base = VS_BASE_URL.replace(/\/+$/, '');
+  return `${base}/us/search?q=${encodeURIComponent(query)}`;
+}
 
 // Bras PLP URL
 const BRAS_PLP_URL = `${VS_BASE_URL}/us/vs/bras`;
@@ -672,7 +678,7 @@ test.describe('Bras — Selecting (Desktop E2E)', () => {
       if (linkCountAfter === 0) {
         smoothSource = 'srp';
         warn('Push-Up + Smooth filter fallback had no product links; using SRP search fallback.');
-        const srpUrl = `${VS_BASE_URL}search?q=${encodeURIComponent('smooth bra')}`;
+        const srpUrl = vsUsSearchUrl('smooth bra');
         await page.goto(srpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
         await checkpoint(page);
         await bestEffortWaitForTransientLoaders(page);
@@ -1156,7 +1162,7 @@ test.describe('Bras — Selecting (Desktop E2E)', () => {
     const linkCount = await candidates.count().catch(() => 0);
     if (linkCount === 0) {
       warn(`Smooth PLP had no product links; using SRP search fallback.`);
-      const srpUrl = `${VS_BASE_URL}search?q=${encodeURIComponent('smooth wireless bra')}`;
+      const srpUrl = vsUsSearchUrl('smooth wireless bra');
       await page.goto(srpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
       await checkpoint(page);
       await bestEffortWaitForTransientLoaders(page);
@@ -1321,7 +1327,7 @@ test.describe('Bras — Selecting (Desktop E2E)', () => {
     const linkCount = await candidates.count().catch(() => 0);
     if (linkCount === 0) {
       warn(`Smooth PLP had no product links; using SRP search fallback.`);
-      const srpUrl = `${VS_BASE_URL}search?q=${encodeURIComponent('smooth t-shirt bra')}`;
+      const srpUrl = vsUsSearchUrl('smooth t-shirt bra');
       await page.goto(srpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
       await checkpoint(page);
       await bestEffortWaitForTransientLoaders(page);
@@ -1486,7 +1492,7 @@ test.describe('Bras — Selecting (Desktop E2E)', () => {
     const linkCount = await candidates.count().catch(() => 0);
     if (linkCount === 0) {
       warn(`Smooth PLP had no product links; using SRP search fallback.`);
-      const srpUrl = `${VS_BASE_URL}search?q=${encodeURIComponent('smooth strapless bra')}`;
+      const srpUrl = vsUsSearchUrl('smooth strapless bra');
       await page.goto(srpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
       await checkpoint(page);
       await bestEffortWaitForTransientLoaders(page);
@@ -1651,7 +1657,7 @@ test.describe('Bras — Selecting (Desktop E2E)', () => {
     const linkCount = await candidates.count().catch(() => 0);
     if (linkCount === 0) {
       warn(`Smooth PLP had no product links; using SRP search fallback.`);
-      const srpUrl = `${VS_BASE_URL}search?q=${encodeURIComponent('smooth demi bra')}`;
+      const srpUrl = vsUsSearchUrl('smooth demi bra');
       await page.goto(srpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
       await checkpoint(page);
       await bestEffortWaitForTransientLoaders(page);
@@ -2518,7 +2524,7 @@ test.describe('Bras — Selecting (Desktop E2E)', () => {
     if (linkCount === 0) {
       gradientShineSource = 'srp';
       warn(`Gradient Shine PLP had no product links (URL=${page.url()}); using SRP search fallback.`);
-      const srpUrl = `${VS_BASE_URL}/search?q=${encodeURIComponent('gradient shine bra')}`;
+      const srpUrl = vsUsSearchUrl('gradient shine bra');
       await page.goto(srpUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
       await checkpoint(page);
       await bestEffortWaitForTransientLoaders(page);
