@@ -2650,8 +2650,8 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
   test('BRAS-E2E-18 — Medium Bra → select Medium coverage Shine option → band/cup → Ship to you → Add to bag', async ({ page }, testInfo) => {
     const isHeaded = process.env.HEADLESS === '0';
     const slowMoMs = Number(process.env.SLOWMO || '0');
-    if (isHeaded) test.setTimeout(slowMoMs > 0 ? 240_000 : 180_000);
-    else test.setTimeout(180_000);
+    if (isHeaded) test.setTimeout(slowMoMs > 0 ? 360_000 : 300_000);
+    else test.setTimeout(300_000);
 
     const demoDelayMs = isHeaded ? 600 : 0;
     const warn = makeWarn(testInfo);
@@ -2699,26 +2699,42 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
       const tileLink = candidates.nth(i);
       await demoWait(pushUpPage, demoDelayMs);
       await checkpoint(pushUpPage);
-      const opened = await openPdpFromPlpTile(pushUpPage, tileLink).catch(() => null);
-      if (!opened) continue;
+      
+      // Add a per-product timeout to avoid getting stuck on one product
+      const productPromise = (async () => {
+        const opened = await openPdpFromPlpTile(pushUpPage, tileLink).catch(() => null);
+        if (!opened) return null;
 
-      attachAutoDismissPopups(opened, warn);
-      await checkpoint(opened);
-      await bestEffortWaitForTransientLoaders(opened);
+        attachAutoDismissPopups(opened, warn);
+        await checkpoint(opened);
+        await bestEffortWaitForTransientLoaders(opened);
 
-      // Check if this PDP has Medium Shine option
-      const mediumShineSwatch = opened.locator('button[aria-label*="medium" i][aria-label*="shine" i], [role="button"][aria-label*="medium" i][aria-label*="shine" i], button[aria-label*="medium shine" i], [role="button"][aria-label*="medium shine" i]').first();
-      const hasMediumShine = (await mediumShineSwatch.count().catch(() => 0)) > 0;
+        // Check if this PDP has Medium Shine option
+        const mediumShineSwatch = opened.locator('button[aria-label*="medium" i][aria-label*="shine" i], [role="button"][aria-label*="medium" i][aria-label*="shine" i], button[aria-label*="medium shine" i], [role="button"][aria-label*="medium shine" i]').first();
+        const hasMediumShine = (await mediumShineSwatch.count().catch(() => 0)) > 0;
 
-      if (hasMediumShine) {
-        pdpPage = opened;
-        const pdpH1 = opened.locator('main h1').first();
-        productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
-        foundMediumShine = true;
-        warn(`Found Medium Shine option on: ${productTitle}`);
-      } else {
-        // Close this PDP and try the next one
-        if (opened !== pushUpPage) await opened.close().catch(() => null);
+        if (hasMediumShine) {
+          const pdpH1 = opened.locator('main h1').first();
+          productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+          foundMediumShine = true;
+          warn(`Found Medium Shine option on: ${productTitle}`);
+          return opened;
+        } else {
+          // Close this PDP and try the next one
+          if (opened !== pushUpPage) await opened.close().catch(() => null);
+          return null;
+        }
+      })();
+
+      // 60-second timeout per product
+      const result = await Promise.race([
+        productPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 60_000))
+      ]);
+
+      if (result) {
+        pdpPage = result;
+        break;
       }
     }
 

@@ -474,6 +474,43 @@ Scope: Manual UI + functional test cases for the Victoria’s Secret US site (`h
 - Expected:
   - No clipped UI; interactions remain possible in both viewports.
 
+### PLP-TC-11 — Full-Coverage Bras: hover image and verify every color swatch
+- Viewport: Desktop, recommended 1440×900
+- Preconditions:
+  - Use a fresh browser session.
+  - Dismiss cookie, marketing, survey, or location prompts if they appear.
+- Steps:
+  1. Open `https://www.victoriassecret.com/us/`.
+  2. Locate the **Bras** link under the **Victoria’s Secret** header/title area.
+  3. Hover over **Bras** to open the mega menu. If hover does not open it, click **Bras** and continue.
+  4. Select **All Bras A–F Cups**.
+  5. Confirm that the Bras page loads and that the page heading and product grid are visible.
+  6. Select **Full Coverage Bras** from the Bras page category navigation, filter, or category card. Use the exact visible label when wording differs slightly.
+  7. Confirm that the Full-Coverage Bras PLP loads and that product tiles are visible.
+  8. Identify the first product tile in the grid and record its product name and the number of color swatches shown at the bottom of the tile.
+  9. Hover over the first product image without clicking.
+  10. Observe whether the image changes from the front view to a back view or another alternate product view.
+  11. Move the pointer away from the image, then hover over it again to confirm the behavior is repeatable.
+  12. Starting with the first available color radio button/swatch at the bottom of the tile, click each swatch one at a time until every available color has been tested.
+  13. After each click, wait for the tile image and selected-swatch state to finish updating before selecting the next color.
+  14. For each color, record the swatch label or accessible name and observe whether the bra image changes to the selected color.
+- Expected:
+  - Hovering **Bras** exposes a usable menu, and **All Bras A–F Cups** is present and selectable.
+  - The Bras page loads without a blank state, broken layout, or blocking overlay.
+  - **Full Coverage Bras** is available and opens the correct Full-Coverage Bras PLP.
+  - The first product tile displays a product image, product name, and available color swatches/radio buttons.
+  - Hovering the image changes it from the front image to a back/alternate image, or the tile clearly indicates that no alternate image is available.
+  - Each clicked color swatch becomes selected and remains visibly distinguishable from unselected swatches.
+  - The product image changes to the corresponding bra color for every swatch that is available and selectable.
+  - No swatch click causes a broken image, layout shift that hides the controls, navigation away from the PLP, or an error state.
+- Result:
+  - Status: PASS / FAIL / BLOCKED
+  - Product name:
+  - Full-Coverage Bras URL:
+  - Swatches tested and image result for each:
+  - Hover front-to-back result: PASS / FAIL / NOT AVAILABLE
+  - Notes / Evidence links or screenshots:
+
 ---
 
 ## Automation Reference (Optional)

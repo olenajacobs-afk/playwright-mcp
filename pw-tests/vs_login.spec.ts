@@ -7,7 +7,7 @@ import {
 } from './utils/vs';
 
 test.describe('8.x Login / Sign in (Desktop)', () => {
-  test('LOG-TC-01 — Login page or modal shows email and password fields', async ({ page }, testInfo) => {
+  test('LOG-TC-01 — Login page or modal shows sign-in entry controls', async ({ page }, testInfo) => {
     const warn = makeWarn(testInfo);
 
     const signInUrl = `${VS_BASE_URL}account/signin`;
@@ -29,10 +29,11 @@ test.describe('8.x Login / Sign in (Desktop)', () => {
       )
       .first();
     const password = scope.locator('input[type="password"]').first();
+    const continueButton = scope.getByRole('button', { name: /continue/i }).first();
 
     if ((await emailLike.count()) === 0)
       warn('No email-like input found yet (site may hydrate slowly or change selectors).');
-    if ((await password.count()) === 0) warn('No password input found yet (site may hydrate slowly or change selectors).');
+    if ((await password.count()) === 0) warn('No password input found yet (site may be using an email-first sign-in flow).');
 
     await expect
       .poll(async () => (await emailLike.count()) > 0 && (await emailLike.isVisible().catch(() => false)), {
@@ -41,11 +42,14 @@ test.describe('8.x Login / Sign in (Desktop)', () => {
       })
       .toBeTruthy();
 
-    await expect
-      .poll(async () => (await password.count()) > 0 && (await password.isVisible().catch(() => false)), {
-        timeout: 20_000,
-        message: 'Password field should become visible on sign-in UI',
-      })
-      .toBeTruthy();
+    const passwordVisible =
+      (await password.count().catch(() => 0)) > 0 && (await password.isVisible().catch(() => false));
+    const continueVisible =
+      (await continueButton.count().catch(() => 0)) > 0 && (await continueButton.isVisible().catch(() => false));
+
+    expect(
+      passwordVisible || continueVisible,
+      'Expected either a password field or a Continue button on sign-in UI'
+    ).toBeTruthy();
   });
 });

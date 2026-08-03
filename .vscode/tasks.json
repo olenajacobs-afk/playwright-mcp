@@ -28,12 +28,34 @@
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "test",
+			"options": {
+				"env": {
+					"PW_SINGLE_PROCESS": "0"
+				}
+			},
 			"presentation": {
 				"reveal": "always",
 				"focus": true,
 				"panel": "dedicated",
 				"clear": true
 			}
+		},
+		{
+			"label": "PW: Medium Coverage Tests (BRAS-E2E-09, 10, 18)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"pw:test:vs",
+				"--",
+				"pw-tests/vs_bras_add_to_bag.spec.ts",
+				"-g",
+				"BRAS-E2E-09|BRAS-E2E-10|BRAS-E2E-18",
+				"--project=chromium",
+				"--reporter=line,html"
+			],
+			"isBackground": false,
+			"group": "test"
 		}
 	]
 }
