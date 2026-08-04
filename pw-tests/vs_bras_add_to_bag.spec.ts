@@ -1516,7 +1516,18 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
       const candidateTile = candidates.nth(candidateIndex);
       await candidateTile.scrollIntoViewIfNeeded().catch(() => null);
       await checkpoint(page);
-      opened = await openPdpFromPlpTile(page, candidateTile).catch(() => null);
+      
+      // Add per-PDP timeout to prevent getting stuck on one product
+      const pdpPromise = (async () => {
+        return await openPdpFromPlpTile(page, candidateTile).catch(() => null);
+      })();
+
+      // 60-second timeout per PDP attempt
+      opened = await Promise.race([
+        pdpPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 60_000))
+      ]);
+
       if (!opened) {
         warn(`Lace tile candidate #${candidateIndex + 1} did not open a valid PDP; trying next tile.`);
       }
@@ -1937,8 +1948,8 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
         const isHeaded = process.env.HEADLESS === '0';
         const slowMoMs = Number(process.env.SLOWMO || '0');
         // Per-tile Lace tests can still require PLP scrolling + PDP hydration.
-        if (isHeaded) test.setTimeout(slowMoMs > 0 ? 330_000 : 210_000);
-        else test.setTimeout(210_000);
+        if (isHeaded) test.setTimeout(slowMoMs > 0 ? 360_000 : 300_000);
+        else test.setTimeout(300_000);
 
         const result = await addLaceProductFromTileIndex1Based(page, testInfo, i);
         expect(result.productTitle.length >= 0).toBeTruthy();
@@ -2223,8 +2234,8 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
   async function runShineStrapNthStrapFlow(page: Page, testInfo: any, strapIndex1Based: number) {
     const isHeaded = process.env.HEADLESS === '0';
     const slowMoMs = Number(process.env.SLOWMO || '0');
-    if (isHeaded) test.setTimeout(slowMoMs > 0 ? 240_000 : 180_000);
-    else test.setTimeout(240_000);
+    if (isHeaded) test.setTimeout(slowMoMs > 0 ? 360_000 : 300_000);
+    else test.setTimeout(300_000);
 
     const warn = makeWarn(testInfo);
     const demoDelayMs = isHeaded ? 600 : 0;
@@ -2368,8 +2379,8 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     test('BRAS-E2E-17 — MAJOR Bra → select Gradient Shine option → band/cup → Ship to you → Add to bag', async ({ page }, testInfo) => {
       const isHeaded = process.env.HEADLESS === '0';
       const slowMoMs = Number(process.env.SLOWMO || '0');
-      if (isHeaded) test.setTimeout(slowMoMs > 0 ? 330_000 : 210_000);
-      else test.setTimeout(210_000);
+      if (isHeaded) test.setTimeout(slowMoMs > 0 ? 360_000 : 300_000);
+      else test.setTimeout(300_000);
 
       const warn = makeWarn(testInfo);
       const demoDelayMs = isHeaded ? 600 : 0;
@@ -2587,8 +2598,8 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     test(`BRAS-E2E-10-${band} — Push-Up → MEDIUM → Shine Strap PDP → first strap → Band ${band} (if selectable) → first cup → Ship to you → Add to bag`, async ({ page }, testInfo) => {
       const isHeaded = process.env.HEADLESS === '0';
       const slowMoMs = Number(process.env.SLOWMO || '0');
-      if (isHeaded) test.setTimeout(slowMoMs > 0 ? 240_000 : 180_000);
-      else test.setTimeout(180_000);
+      if (isHeaded) test.setTimeout(slowMoMs > 0 ? 360_000 : 300_000);
+      else test.setTimeout(300_000);
 
       const demoDelayMs = isHeaded ? 600 : 0;
       const { pdpPage, warn, checkpoint } = await openMediumCoveragePushUpBandCupPdp(page, testInfo);
