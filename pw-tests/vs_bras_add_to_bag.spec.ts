@@ -1404,6 +1404,97 @@ async function selectNthShineStrapSwatchRequired(pdpPage: Page, n1Based: number)
   throw new Error(`Requested strap swatch #${n} but only found ${seen} visible/enabled swatches.`);
 }
 
+/**
+ * Consolidated workflow for band-cup-ship-add-to-bag flow.
+ * Extracts the common pattern used by BRAS-E2E-06, BRAS-E2E-08, and BRAS-E2E-10.
+ *
+ * @param pdpPage The PDP page to perform the workflow on
+ * @param band The band size to select
+ * @param warn Warning logger
+ * @param checkpoint Async checkpoint function to clear overlays
+ * @param demoDelayMs Delay to insert between actions for demo/visual purposes
+ * @param isHeaded Whether running in headed mode
+ * @param options Additional options
+ */
+async function performBandCupShipWorkflow(
+  pdpPage: Page,
+  band: number,
+  warn: (msg: string) => void,
+  checkpoint: (p: Page) => Promise<void>,
+  demoDelayMs: number,
+  isHeaded: boolean,
+  options?: { includeColor?: boolean; productContext?: string; miniBagDelayMs?: number }
+): Promise<{ productTitle: string }> {
+  const { includeColor = true, productContext, miniBagDelayMs } = options || {};
+
+  const pdpH1 = pdpPage.locator('main h1').first();
+  await expect(pdpH1, 'Expected PDP H1').toBeVisible({ timeout: 30_000 });
+  const productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+  await demoWait(pdpPage, demoDelayMs);
+
+  // First color (optional).
+  if (includeColor) {
+    await checkpoint(pdpPage);
+    await selectFirstColorBestEffort(pdpPage, warn);
+    await demoWait(pdpPage, demoDelayMs);
+  }
+
+  // Target band.
+  await checkpoint(pdpPage);
+  const selectableBands = await getSelectableBandValuesBestEffort(pdpPage);
+  const selected = await selectBandValueBestEffort(pdpPage, band);
+  if (!selected) {
+    const strict = process.env.STRICT_BAND_SELECTION === '1';
+    const contextStr = productContext ? ` on ${productContext}` : '';
+    if (selectableBands.length > 0) {
+      warn(`Band ${band} not selectable${contextStr}; selectable bands were: ${selectableBands.join(', ')}. Selecting first available band instead.`);
+    } else {
+      warn(`Band ${band} not selectable${contextStr} and could not enumerate selectable bands; selecting first available band instead.`);
+    }
+
+    if (strict) {
+      throw new Error(`STRICT_BAND_SELECTION=1: Band ${band} was not selectable${contextStr}.`);
+    }
+    await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
+  }
+  await demoWait(pdpPage, demoDelayMs);
+
+  // First cup.
+  await checkpoint(pdpPage);
+  try {
+    await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    warn(`Cup selection failed for band=${band}; selecting first available band and retrying cup. (${msg})`);
+    await checkpoint(pdpPage);
+    await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
+    await checkpoint(pdpPage);
+    await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
+  }
+  await demoWait(pdpPage, demoDelayMs);
+
+  // Ship to you.
+  await checkpoint(pdpPage);
+  await selectShipToYouBestEffort(pdpPage, warn);
+  await demoWait(pdpPage, demoDelayMs);
+
+  // Add to bag.
+  const addToBag = addToBagButton(pdpPage);
+  await checkpoint(pdpPage);
+  await expect(addToBag, 'Expected Add to bag button to be visible').toBeVisible({ timeout: 30_000 });
+  await expect(addToBag, 'Expected Add to bag button to be enabled').toBeEnabled({ timeout: 20_000 });
+  await addToBag.click({ timeout: 20_000 });
+  await checkpoint(pdpPage);
+  await bestEffortWaitForTransientLoaders(pdpPage);
+
+  await checkpoint(pdpPage);
+  const finalDelayMs = miniBagDelayMs !== undefined ? miniBagDelayMs : (isHeaded ? 2500 : 0);
+  await waitForMiniBagOverlay(pdpPage, { requireVisible: isHeaded, productTitle, warn });
+  await demoWait(pdpPage, finalDelayMs);
+
+  return { productTitle };
+}
+
 test.describe('Bras — Add to Bag (Desktop E2E)', () => {
   async function openLacePlpBestEffort(page: Page, warn: (m: string) => void, checkpoint: (p: Page) => Promise<void>) {
     const hasAnyProductLinks = async () => {
@@ -2056,66 +2147,10 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
 
       const { pdpPage, warn, checkpoint } = await openMajorPushUpBandCupPdp(page, testInfo);
 
-      const pdpH1 = pdpPage.locator('main h1').first();
-      await expect(pdpH1, 'Expected PDP H1').toBeVisible({ timeout: 30_000 });
-      const productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
-      await demoWait(pdpPage, demoDelayMs);
-
-      // First color.
-      await checkpoint(pdpPage);
-      await selectFirstColorBestEffort(pdpPage, warn);
-      await demoWait(pdpPage, demoDelayMs);
-
-      // Target band.
-      await checkpoint(pdpPage);
-      const selectableBands = await getSelectableBandValuesBestEffort(pdpPage);
-      const selected = await selectBandValueBestEffort(pdpPage, band);
-      if (!selected) {
-        const strict = process.env.STRICT_BAND_SELECTION === '1';
-        if (selectableBands.length > 0) {
-          warn(`Band ${band} not selectable on this PDP; selectable bands were: ${selectableBands.join(', ')}. Selecting first available band instead.`);
-        } else {
-          warn(`Band ${band} not selectable and could not enumerate selectable bands; selecting first available band instead.`);
-        }
-
-        if (strict) {
-          throw new Error(`STRICT_BAND_SELECTION=1: Band ${band} was not selectable on this PDP.`);
-        }
-        await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
-      }
-      await demoWait(pdpPage, demoDelayMs);
-
-      // First cup.
-      await checkpoint(pdpPage);
-      try {
-        await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        warn(`Cup selection failed for band=${band}; selecting first available band and retrying cup. (${msg})`);
-        await checkpoint(pdpPage);
-        await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
-        await checkpoint(pdpPage);
-        await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
-      }
-      await demoWait(pdpPage, demoDelayMs);
-
-      // Ship to you.
-      await checkpoint(pdpPage);
-      await selectShipToYouBestEffort(pdpPage, warn);
-      await demoWait(pdpPage, demoDelayMs);
-
-      // Add to bag.
-      const addToBag = addToBagButton(pdpPage);
-      await checkpoint(pdpPage);
-      await expect(addToBag, 'Expected Add to bag button to be visible').toBeVisible({ timeout: 30_000 });
-      await expect(addToBag, 'Expected Add to bag button to be enabled').toBeEnabled({ timeout: 20_000 });
-      await addToBag.click({ timeout: 20_000 });
-      await checkpoint(pdpPage);
-      await bestEffortWaitForTransientLoaders(pdpPage);
-
-      await checkpoint(pdpPage);
-      await waitForMiniBagOverlay(pdpPage, { requireVisible: isHeaded, productTitle, warn });
-      await demoWait(pdpPage, isHeaded ? 2500 : 0);
+      await performBandCupShipWorkflow(pdpPage, band, warn, checkpoint, demoDelayMs, isHeaded, {
+        includeColor: true,
+        productContext: 'Push-Up MAJOR PDP',
+      });
 
       expect(true).toBeTruthy();
     });
@@ -2180,52 +2215,11 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
       const demoDelayMs = isHeaded ? 600 : 0;
       const { pdpPage, warn, checkpoint } = await openShineStrapMajorBandCupPdp(page, testInfo);
 
-      const pdpH1 = pdpPage.locator('main h1').first();
-      await expect(pdpH1, 'Expected PDP H1').toBeVisible({ timeout: 30_000 });
-      const productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
-
-      await demoWait(pdpPage, demoDelayMs);
-
-      await checkpoint(pdpPage);
-      const selectableBands = await getSelectableBandValuesBestEffort(pdpPage);
-      const selected = await selectBandValueBestEffort(pdpPage, band);
-      if (!selected) {
-        const strict = process.env.STRICT_BAND_SELECTION === '1';
-        warn(
-          `Band ${band} not selectable on this Shine Strap PDP; selectable bands were: ${selectableBands.join(', ') || 'unknown'}. Selecting first available band instead.`
-        );
-        if (strict) throw new Error(`STRICT_BAND_SELECTION=1: Band ${band} was not selectable on this Shine Strap PDP.`);
-        await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
-      }
-      await demoWait(pdpPage, demoDelayMs);
-
-      await checkpoint(pdpPage);
-      try {
-        await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        warn(`Cup selection failed for band=${band}; selecting first available band and retrying cup. (${msg})`);
-        await checkpoint(pdpPage);
-        await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
-        await checkpoint(pdpPage);
-        await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
-      }
-      await demoWait(pdpPage, demoDelayMs);
-
-      await checkpoint(pdpPage);
-      await selectShipToYouBestEffort(pdpPage, warn);
-      await demoWait(pdpPage, demoDelayMs);
-
-      const addToBag = addToBagButton(pdpPage);
-      await checkpoint(pdpPage);
-      await expect(addToBag, 'Expected Add to bag button to be visible').toBeVisible({ timeout: 30_000 });
-      await expect(addToBag, 'Expected Add to bag button to be enabled').toBeEnabled({ timeout: 20_000 });
-      await addToBag.click({ timeout: 20_000 });
-
-      await checkpoint(pdpPage);
-      await bestEffortWaitForTransientLoaders(pdpPage);
-      await waitForMiniBagOverlay(pdpPage, { requireVisible: isHeaded, productTitle, warn });
-      await demoWait(pdpPage, isHeaded ? 1500 : 0);
+      await performBandCupShipWorkflow(pdpPage, band, warn, checkpoint, demoDelayMs, isHeaded, {
+        includeColor: false,
+        productContext: 'Shine Strap MAJOR PDP',
+        miniBagDelayMs: isHeaded ? 1500 : 0,
+      });
 
       expect(true).toBeTruthy();
     });
@@ -2604,54 +2598,10 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
       const demoDelayMs = isHeaded ? 600 : 0;
       const { pdpPage, warn, checkpoint } = await openMediumCoveragePushUpBandCupPdp(page, testInfo);
 
-      const pdpH1 = pdpPage.locator('main h1').first();
-      await expect(pdpH1, 'Expected PDP H1').toBeVisible({ timeout: 30_000 });
-      const productTitle = ((await pdpH1.innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
-
-      await demoWait(pdpPage, demoDelayMs);
-
-      await checkpoint(pdpPage);
-      const selectableBands = await getSelectableBandValuesBestEffort(pdpPage);
-      const selected = await selectBandValueBestEffort(pdpPage, band);
-      if (!selected) {
-        const strict = process.env.STRICT_BAND_SELECTION === '1';
-        warn(
-          `Band ${band} not selectable on this Medium Shine Strap PDP; selectable bands were: ${selectableBands.join(', ') || 'unknown'}. Selecting first available band instead.`
-        );
-        if (strict) throw new Error(`STRICT_BAND_SELECTION=1: Band ${band} was not selectable on this Medium Shine Strap PDP.`);
-        await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
-      }
-      await demoWait(pdpPage, demoDelayMs);
-
-      await checkpoint(pdpPage);
-      try {
-        await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        warn(`Cup selection failed for band=${band}; selecting first available band and retrying cup. (${msg})`);
-        await checkpoint(pdpPage);
-        await selectFirstAvailableFromSection(pdpPage, /\bband\b|band\s*size/i);
-        await checkpoint(pdpPage);
-        await selectFirstAvailableFromSection(pdpPage, /\bcup\b|cup\s*size/i);
-      }
-
-      // Ship to you
-      await checkpoint(pdpPage);
-      await selectShipToYouBestEffort(pdpPage, warn);
-      await demoWait(pdpPage, demoDelayMs);
-
-      // Add to bag
-      const addToBag = addToBagButton(pdpPage);
-      await checkpoint(pdpPage);
-      await expect(addToBag, 'Expected Add to bag button to be visible').toBeVisible({ timeout: 30_000 });
-      await expect(addToBag, 'Expected Add to bag button to be enabled').toBeEnabled({ timeout: 20_000 });
-      await addToBag.click({ timeout: 20_000 });
-      await checkpoint(pdpPage);
-      await bestEffortWaitForTransientLoaders(pdpPage);
-
-      await checkpoint(pdpPage);
-      await waitForMiniBagOverlay(pdpPage, { requireVisible: isHeaded, productTitle, warn });
-      await demoWait(pdpPage, isHeaded ? 2500 : 0);
+      await performBandCupShipWorkflow(pdpPage, band, warn, checkpoint, demoDelayMs, isHeaded, {
+        includeColor: false,
+        productContext: 'Medium Shine Strap PDP',
+      });
 
       expect(true).toBeTruthy();
     });
