@@ -42,6 +42,19 @@ async function demoWait(page: Page, ms: number) {
   await page.waitForTimeout(ms).catch(() => null);
 }
 
+/**
+ * Standard checkpoint function to dismiss overlays and popups.
+ * Used throughout tests to ensure clean state before proceeding.
+ */
+function createCheckpoint(): (p: Page) => Promise<void> {
+  return async (p: Page) => {
+    await bestEffortPressEscape(p);
+    await bestEffortDismissAllPopups(p);
+    await bestEffortDismissOverlays(p);
+    await ensureNoBlockingOverlays(p);
+  };
+}
+
 async function waitForSizeOrBandCupSelectors(page: Page, timeout = 10_000) {
   const selectors = [
     '.size-selector',
@@ -686,12 +699,7 @@ async function openSportBraBandCupPdpFromHomeFlow(page: Page, testInfo: any) {
   const warn = makeWarn(testInfo);
   attachAutoDismissPopups(page, warn);
 
-  const checkpoint = async (p: Page) => {
-    await bestEffortPressEscape(p);
-    await bestEffortDismissAllPopups(p);
-    await bestEffortDismissOverlays(p);
-    await ensureNoBlockingOverlays(p);
-  };
+  const checkpoint = createCheckpoint();
 
   await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   await checkpoint(page);
@@ -793,12 +801,7 @@ async function openShineStrapMajorBandCupPdp(page: Page, testInfo: any) {
   const warn = makeWarn(testInfo);
   attachAutoDismissPopups(page, warn);
 
-  const checkpoint = async (p: Page) => {
-    await bestEffortPressEscape(p);
-    await bestEffortDismissAllPopups(p);
-    await bestEffortDismissOverlays(p);
-    await ensureNoBlockingOverlays(p);
-  };
+  const checkpoint = createCheckpoint();
 
   // Go straight to Push-Up PLP (fastest and most stable entry point for MAJOR/shine-strap flows).
   await page.goto(PUSHUP_PLP_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
@@ -1573,12 +1576,7 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     const demoDelayMs = isHeaded ? 600 : 0;
 
     attachAutoDismissPopups(page, warn);
-    const checkpoint = async (p: Page) => {
-      await bestEffortPressEscape(p);
-      await bestEffortDismissAllPopups(p);
-      await bestEffortDismissOverlays(p);
-      await ensureNoBlockingOverlays(p);
-    };
+    const checkpoint = createCheckpoint();
 
     const { laceSource, plpUrl } = await openLacePlpBestEffort(page, warn, checkpoint);
 
@@ -1914,12 +1912,7 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     const demoDelayMs = isHeaded ? 600 : 0;
 
     attachAutoDismissPopups(page, warn);
-    const checkpoint = async (p: Page) => {
-      await bestEffortPressEscape(p);
-      await bestEffortDismissAllPopups(p);
-      await bestEffortDismissOverlays(p);
-      await ensureNoBlockingOverlays(p);
-    };
+    const checkpoint = createCheckpoint();
 
     await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await checkpoint(page);
@@ -2051,12 +2044,7 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     const warn = makeWarn(testInfo);
     attachAutoDismissPopups(page, warn);
 
-    const checkpoint = async (p: Page) => {
-      await bestEffortPressEscape(p);
-      await bestEffortDismissAllPopups(p);
-      await bestEffortDismissOverlays(p);
-      await ensureNoBlockingOverlays(p);
-    };
+    const checkpoint = createCheckpoint();
 
     await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await checkpoint(page);
@@ -2093,12 +2081,7 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     const warn = makeWarn(testInfo);
     attachAutoDismissPopups(page, warn);
 
-    const checkpoint = async (p: Page) => {
-      await bestEffortPressEscape(p);
-      await bestEffortDismissAllPopups(p);
-      await bestEffortDismissOverlays(p);
-      await ensureNoBlockingOverlays(p);
-    };
+    const checkpoint = createCheckpoint();
 
     await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await checkpoint(page);
@@ -2235,12 +2218,7 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     const demoDelayMs = isHeaded ? 600 : 0;
 
     attachAutoDismissPopups(page, warn);
-    const checkpoint = async (p: Page) => {
-      await bestEffortPressEscape(p);
-      await bestEffortDismissAllPopups(p);
-      await bestEffortDismissOverlays(p);
-      await ensureNoBlockingOverlays(p);
-    };
+    const checkpoint = createCheckpoint();
 
     // Go straight to Push-Up PLP (fastest and most stable entry point for MAJOR/shine-strap flows).
     await page.goto(PUSHUP_PLP_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
@@ -2380,12 +2358,7 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
       const demoDelayMs = isHeaded ? 600 : 0;
 
       attachAutoDismissPopups(page, warn);
-      const checkpoint = async (p: Page) => {
-        await bestEffortPressEscape(p);
-        await bestEffortDismissAllPopups(p);
-        await bestEffortDismissOverlays(p);
-        await ensureNoBlockingOverlays(p);
-      };
+      const checkpoint = createCheckpoint();
 
       // Prefer Gradient Shine PLP → general Bras PLP → SRP (tiles often use "*-catalog/*" URLs, not only "/p/")
       const gradientPlpAttempts = [
@@ -2617,12 +2590,7 @@ test.describe('Bras — Add to Bag (Desktop E2E)', () => {
     const demoDelayMs = isHeaded ? 600 : 0;
     const warn = makeWarn(testInfo);
 
-    const checkpoint = async (p: Page) => {
-      await bestEffortPressEscape(p);
-      await bestEffortDismissAllPopups(p);
-      await bestEffortDismissOverlays(p);
-      await ensureNoBlockingOverlays(p);
-    };
+    const checkpoint = createCheckpoint();
 
     await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await checkpoint(page);
