@@ -1,8 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+// Performance tests only run on chromium (not needed on multiple browsers)
+test.describe.configure({ mode: 'serial' });
+
 test.describe('VS Full Coverage Bras Performance Testing', () => {
   const BASE_URL = 'https://www.victoriassecret.com';
   const FULL_COVERAGE_URL = `${BASE_URL}/us/vs/bras/full-coverage`;
+
+  // Skip performance tests on Firefox (they're not browser-specific)
+  test.skip(({ browserName }) => browserName !== 'chromium', 'Performance tests only run on Chromium');
 
   // Performance thresholds (in milliseconds)
   const THRESHOLDS = {
