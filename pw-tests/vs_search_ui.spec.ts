@@ -11,6 +11,8 @@ import {
 } from './utils/vs';
 
 test.describe('8.4 Search UI (Desktop only)', () => {
+  test.setTimeout(180_000); // Extended timeout for live site tests
+  
   const BRA_TERM = 'bra';
 
   test('SEARCH-TC-01 — Search entry point is visible in header', async ({ page }) => {
@@ -405,6 +407,8 @@ test.describe('8.4 Search UI (Desktop only)', () => {
 });
 
 test.describe('8.4 Search UI — BRAS term (Desktop only)', () => {
+  test.setTimeout(180_000); // Extended timeout for live site tests
+  
   const BRAS_TERM = 'bras';
 
   test('BRAS-TC-01 — Submit search navigates to SRP (BRAS)', async ({ page }, testInfo) => {

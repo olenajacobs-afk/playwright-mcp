@@ -26,6 +26,7 @@ function getPlpProductLinks(page: Page) {
 }
 
 test.describe('Navigation + PLP (Desktop only)', () => {
+  test.setTimeout(180_000); // Firefox tests are slow on live site
   test('NAV-TC-01 — Global header navigation entry points render', async ({ page }) => {
     await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await bestEffortDismissOverlays(page);

@@ -608,6 +608,8 @@ async function addToBagAndVerifyBestEffort(page: Page, warn: (m: string) => void
 }
 
 test.describe('Bras — Matrix Add to Bag', () => {
+  test.setTimeout(180_000); // Extended timeout for live site matrix tests
+  
   const allTypes: BraTypeName[] = [
     'Push Up',
     'Full-Coverage',

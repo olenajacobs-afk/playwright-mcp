@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('VS Full Coverage Bras API Validation', () => {
+  test.setTimeout(180_000); // Extended timeout for live site API tests
+  
   const API_BASE_URL = 'https://www.victoriassecret.com';
   const FULL_COVERAGE_CATEGORY = '/us/vs/bras/full-coverage';
 

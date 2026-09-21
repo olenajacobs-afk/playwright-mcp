@@ -652,6 +652,8 @@ async function openPdpFromPlpTile(page: Page, tileLink: Locator) {
 }
 
 test.describe('Bras — Selecting (Desktop E2E)', () => {
+  test.setTimeout(180_000); // Extended timeout for live site E2E tests
+  
   // Test setup and helper functions will go here
   // Helper functions for Smooth category
   async function openSmoothPlpBestEffort(page: Page, warn: (m: string) => void, checkpoint: (p: Page) => Promise<void>) {

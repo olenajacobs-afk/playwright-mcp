@@ -1499,6 +1499,8 @@ async function performBandCupShipWorkflow(
 }
 
 test.describe('Bras — Add to Bag (Desktop E2E)', () => {
+  test.setTimeout(180_000); // Extended timeout for live site E2E tests
+  
   async function openLacePlpBestEffort(page: Page, warn: (m: string) => void, checkpoint: (p: Page) => Promise<void>) {
     const hasAnyProductLinks = async () => {
       const main = page.locator('main').first();

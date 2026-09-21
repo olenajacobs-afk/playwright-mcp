@@ -19,9 +19,10 @@ export default defineConfig({
     '**/*.d.ts'
   ],
 
-  timeout: 120_000,
+  timeout: 180_000,           // Increased to 180s for live site
   fullyParallel: true,
   workers: 5,
+  retries: 1,                 // Retry once on failure
 
   // 4. CLEAN TERMINAL: List only the test names
   reporter: [['list'], ['html']],
@@ -30,6 +31,8 @@ export default defineConfig({
     baseURL: 'https://www.victoriassecret.com',
     trace: 'on-first-retry',
     headless: headless,
+    navigationTimeout: 60_000,  // 60s for navigation
+    actionTimeout: 30_000,      // 30s for actions
   },
 
   // 5. THE MULTIPLIER: Running 2 projects will turn 258 files into 516 tests

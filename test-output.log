@@ -1,0 +1,54 @@
+
+> playwright-mcp@1.0.0 pw:test
+> npx playwright test
+
+
+[RUN] desktop-1440 :: home
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+[PASS] desktop-1440 :: home
+
+[RUN] desktop-1440 :: search
+WARN: Expected a search entry in the header (directly or via header menu)
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+WARN: Expected a bag/cart control in the header
+[FAIL] desktop-1440 :: search :: Could not find a visible logo link in header
+  Screenshot: tests/artifacts/vs_desktop-1440_search.png
+
+[RUN] desktop-1920 :: home
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+[PASS] desktop-1920 :: home
+
+[RUN] desktop-1920 :: search
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+[PASS] desktop-1920 :: search
+
+[RUN] tablet-768 :: home
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+[PASS] tablet-768 :: home
+
+[RUN] tablet-768 :: search
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+[PASS] tablet-768 :: search
+
+[RUN] mobile-390 :: home
+WARN: Expected a search entry in the header (directly or via header menu)
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+WARN: Expected a bag/cart control in the header
+[PASS] mobile-390 :: home
+
+[RUN] mobile-390 :: search
+WARN: Expected a search entry in the header (directly or via header menu)
+WARN: Expected an account control in the header (link/button with Account/Sign In)
+WARN: Expected a bag/cart control in the header
+[PASS] mobile-390 :: search
+
+Done: 1 failing run(s)
+
+[RUN] desktop-1440 :: homepage
+WARN: No carousel detected; skipping carousel advance checks
+[FAIL] desktop-1440 :: homepage :: Expected at least one 'Shop Now' CTA on homepage
+  Screenshot: tests/artifacts/vs_home_desktop-1440.png
+
+[RUN] tablet-768 :: homepage
+WARN: Unexpected horizontal overflow (scrollWidth=944 innerWidth=768)
+WARN: Carousel did not advance via controls/swipe (no scroll change or content change detected)

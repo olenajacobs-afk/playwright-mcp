@@ -2,6 +2,8 @@ import { test, expect, type Locator } from '@playwright/test';
 import { bestEffortDismissAllPopups } from './utils/vs';
 
 test.describe('VS Full Coverage Bras', () => {
+  test.setTimeout(180_000); // Extended timeout for live site tests
+  
   test('BRAS-E2E-FC-01 — Full Coverage Bras hover and color change', async ({ page }) => {
     await page.goto('https://www.victoriassecret.com/us/', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(500);

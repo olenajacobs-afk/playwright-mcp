@@ -26,6 +26,8 @@ function safeDescribe(title: string, fn: () => void) {
 }
 
 safeDescribe('8.1 Global Header/Footer (Desktop only)', () => {
+  test.setTimeout(180_000); // Extended timeout for live site tests
+  
   test('GHF-TC-01 — Header renders and is usable', async ({ page }, testInfo) => {
     const warn = makeWarn(testInfo);
     await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });

@@ -7,6 +7,8 @@ import {
 } from './utils/vs';
 
 test.describe('8.x Login / Sign in (Desktop)', () => {
+  test.setTimeout(180_000); // Extended timeout for live site tests
+  
   test('LOG-TC-01 — Login page or modal shows sign-in entry controls', async ({ page }, testInfo) => {
     const warn = makeWarn(testInfo);
 

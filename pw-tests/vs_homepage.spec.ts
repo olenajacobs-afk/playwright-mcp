@@ -8,6 +8,8 @@ import {
 } from './utils/vs';
 
 test.describe('8.2 Homepage (Desktop only)', () => {
+  test.setTimeout(180_000); // Extended timeout for live site tests
+  
   test('HOME-TC-01 — Homepage loads without critical UI breakage', async ({ page }) => {
     await page.goto(VS_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await bestEffortDismissOverlays(page);
